@@ -1,0 +1,82 @@
+---
+title: "PARCIAL FINAL BAYESIANA"
+author: "Angie Lorena Pradilla"
+date: "5 de junio de 2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+En el conjunto de datos Autos.csv aparecen variables correspondientes a algunos autos, particularmente aparece el precio, el peso y si el auto es local o importado. Ajuste un modelo de regresión lineal con errores t donde explique el precio de los autos en términos de las otras dos variables. Postule distribuciones a priori independientes para los parámetros de localización, escala y grados de libertad. Simule aleatorios de la distribución a posteriori y muestre la estimación de los parámetros (media a posteriori, desviación estándar a posteriori) Verifique también que obtiene tasas de aceptación razonables. Como anexo al documento, anexe el código en R.
+
+
+Cargamos la base de datos y la librería 
+```{r, echo = FALSE}
+library(rjags)
+library(R2jags)
+library(coda)
+library(mcmcplots)
+
+library(readr)
+autos <- read_delim("Autos.csv", ";", escape_double = FALSE, 
+    trim_ws = TRUE)
+View(autos)
+head(autos,10)
+```
+
+a continuación se cambiará la variable del tipo de automóvil a una variable dummy adicionalmente despues de asignar las variables correspondientes se corre un modelo de regresión lineal multiple en donde las variables explicativas son el pso y la 
+```{r}
+autos$ID[autos$extranjero=="Importado"]=1
+autos$ID[autos$extranjero=="Local"]=0
+autos=autos[,-3]
+
+
+
+datos=autos
+mpg=autos$mpg
+peso=autos$peso
+ID=autos$ID
+p=ncol(datos)
+n=nrow(datos)
+summary(lm(mpg ~ peso + ID,data = autos))
+```
+
+Luego de esto para simular los aleatorios de la aposteriori para esta regresión se utiliza la estructura del modelo de la siguiente manera con el objetivo de utilizar Jags para su realización:
+```{r}
+modelo =function() {
+  for( i in 1:n){
+    mu[i] <- Intercepto + Peso * peso[i]+ Extranjero * ID[i]
+    mpg[i] ~dt(mu[i],tau,106)
+    
+  }
+  Intercepto ~ dnorm(0, 0.000045) 
+  Peso ~ dnorm(0, 0.000045)
+  Extranjero ~ dnorm(0, 0.000045)
+  tau ~ dgamma(2, 0.1)
+ 
+}
+```
+
+asignamos las entradas del modelo y los parámetros para así usar jags y generar el modelo
+
+```{r}
+datosdeentrada=list("mpg","n","ID","peso")
+
+parametros=c("Intercepto","Peso","Extranjero","tau")
+
+resultado=jags(data = datosdeentrada,parameters.to.save = parametros,
+                 model.file = modelo,n.chains = 4,n.iter = 10000,n.burnin = 1000,n.thin = 2)
+
+
+resultado
+```
+
+Finalmente luego de haber simulado los aleatorios de la aposteriori para el modelo de regresión, hallamos el promedio a posteriori 
+
+```{r}
+mediapost=resultado$BUGSoutput$mean
+
+mediapost
+```
+
